@@ -58,8 +58,8 @@ module HarmonicBalance
     using .TimeEvolution
     export ParameterSweep
 
-    include("modules/Hopf.jl")
-    using .Hopf
+    include("modules/LimitCycles.jl")
+    using .LimitCycles
 
 
 

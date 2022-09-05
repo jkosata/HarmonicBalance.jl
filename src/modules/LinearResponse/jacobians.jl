@@ -56,14 +56,10 @@ Code folllows for an implicit treatment of the Jacobian. Usually we rearrange th
 function _get_J_matrix(eom::HarmonicEquation; order=0)
 
     order > 1 && error("Cannot get a J matrix of order > 1 from the harmonic equations.\nThese are by definition missing higher derivatives")
-
-    Hopf_vars = first.(getfield.(filter(x -> x.type == "Hopf", eom.variables), :symbol))
-    Hopf_idx = findall(x -> any(isequal.(x, Hopf_vars)) , get_variables(eom))
-    nonsingular = filter( x -> x ∉ Hopf_idx, 1:length(get_variables(eom))) # leave out any variables tagged as Hopf - these make J singular
-
+    
     vars_simp = Dict([var => HarmonicBalance.declare_variable(var_name(var)) for var in get_variables(eom)])
     T = get_independent_variables(eom)[1]
-    J = get_Jacobian(eom.equations, d(get_variables(eom), T, order))[nonsingular, nonsingular]
+    J = get_Jacobian(eom.equations, d(get_variables(eom), T, order))
     
     expand_derivatives.(HarmonicBalance.substitute_all(J, vars_simp))
 end

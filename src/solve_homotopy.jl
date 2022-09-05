@@ -91,6 +91,9 @@ function get_steady_states(prob::Problem, swept_parameters::ParameterRange, fixe
     # prepare an array of vectors, each representing one set of input parameters
     # an n-dimensional sweep uses an n-dimensional array
     unique_fixed = filter_duplicate_parameters(swept_parameters, fixed_parameters)
+
+    any([in(var_name(var), var_name.([keys(fixed_parameters)..., keys(swept_parameters)...])) for var in get_variables(prob)]) && error("Cannot fix one of the variables!")
+
     input_array = _prepare_input_params(prob, swept_parameters, unique_fixed)
     # feed the array into HomotopyContinuation, get back an similar array of solutions
     raw = _get_raw_solution(prob, input_array, sweep=swept_parameters, random_warmup=random_warmup, threading=threading)
@@ -194,7 +197,7 @@ function _prepare_input_params(prob::Problem, sweeps::ParameterRange, fixed_para
     all_keys = cat(collect(keys(sweeps)), collect(keys(fixed_parameters)), dims=1)
     # the order of parameters we have now does not correspond to that in prob!
     # get the order from prob and construct a permutation to rearrange our parameters
-    error = ArgumentError("some input parameters are missing or do not appear in the equation")
+    error = ArgumentError("Some input parameters are missing or appear more than once!")
     permutation = try
          p = [findall(x->isequal(x, par), all_keys) for par in prob.parameters] # find the matching position of each parameter
          all((length.(p)) .== 1) || throw(error) # some parameter exists more than twice!
@@ -267,33 +270,3 @@ end
 
 
 tuple_to_vector(t::Tuple) = [i for i in t]
-
-
-###
-# DEPRECATED
-###
-
-
-#=
-
-"Returns the parameters of res which are fixed throughout all solution points."
-function get_fixed_parameters(res::Result)
-    swept_parameters = keys(res.swept_parameters)
-    all_parameters = res.problem.parameters
-    return setdiff(all_parameters, swept_parameters)
-end
-
-function is_Hopf_unstable(solns::Result; index::Int64=0, branch::Int64=0, im_tol=im_tol)
-    unstable(b, i) = is_Hopf_unstable(solns.solutions[i][b], solns.parameters[i], solns.eom, im_tol=im_tol)
-    (index != 0 && branch != 0) && return unstable(branch, index)
-    (index == 0 && branch != 0) && return BitVector([unstable(branch, i) for i in 1:length(solns.solutions)])
-    (index == 0 && branch == 0) && return [BitVector([unstable(b,i) for b in 1:length(solns.solutions[1])]) for i in 1:length(solns.solutions)]
-    (index != 0 && branch == 0) && error("you must specify an index and a branch, only a branch or neither")
-end =#
-
-
-#is_stable(solutions::Vector{SteadyState}, parameters::ParameterVector, eom::Problem; im_tol::Float64) = BitVector([is_stable(single, parameters, eom, im_tol=im_tol) for single in solutions])
-#is_Hopf_unstable(solutions::Vector{SteadyState}, parameters::ParameterVector, eom::Problem; im_tol::Float64) = BitVector([is_Hopf_unstable(single, parameters, eom, im_tol=im_tol) for single in solutions])
-
-
-
