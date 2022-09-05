@@ -25,7 +25,7 @@ module HarmonicBalance
    end
 
    export is_real
-    is_real(x) = abs(imag(x)) < im_tol
+    is_real(x) = abs(imag(x)) / abs(real(x)) < im_tol
     is_real(x::Array) = any(is_real.(x))
 
     # Symbolics does not natively support complex exponentials of variables
@@ -45,8 +45,7 @@ module HarmonicBalance
     include("classification.jl")
     include("saving.jl")
     include("transform_solutions.jl")
-    include("plotting_static.jl")
-    include("plotting_interactive.jl")
+    include("plotting_Plots.jl")
     include("hysteresis_sweep.jl")
 
     include("modules/HC_wrapper.jl")
@@ -55,9 +54,9 @@ module HarmonicBalance
     include("modules/LinearResponse.jl")
     using .LinearResponse
 
-    include("modules/TimeEvolution.jl")
-    using .TimeEvolution
-    export ParameterSweep
+    #include("modules/TimeEvolution.jl")
+    #using .TimeEvolution
+    #export ParameterSweep
 
     include("modules/Hopf.jl")
     using .Hopf
