@@ -1,6 +1,12 @@
 export get_Jacobian
 
 """
+Here stability and linear response is treated with the slow-flow approximation (SFA), see Chapter 5 of JK's thesis.
+Linear response always appears as a sum of Lorentzians, but is inaccurate where these are peaked far from the drive frequency.
+The Jacobian is stored in the Problem object as a function that takes a solution dictionary to give the numerical Jacobian. 
+"""
+
+"""
 $(SIGNATURES)
 
 Obtain the symbolic Jacobian matrix of `eom` (either a `HarmonicEquation` or a `DifferentialEquation`).
@@ -39,59 +45,39 @@ end
 get_Jacobian(eqs::Vector{Equation}, vars::Vector{Num}) = get_Jacobian(Num.(getfield.(eqs, :lhs) .- getfield.(eqs, :rhs)), vars)
 
 
-# the Jacobian of some equations again
-function get_Jacobian_steady(eom::HarmonicEquation; differential_order=0)
+"""
+Code folllows for an implicit treatment of the Jacobian. Usually we rearrange the linear response equations to have time-derivatives on one side.
+    This may be extremely costly. Implicit evaluation means only solving the equations AFTER numerical values have been plugged in, giving
+    a constant time cost per run.
+"""
+
+# for implicit evaluation, the numerical values precede the rearrangement
+# for limit cycles, the zero eigenvalue causes the rearrangement to fail -> filter it out
+function _get_J_matrix(eom::HarmonicEquation; order=0)
+
+    order > 1 && error("Cannot get a J matrix of order > 1 from the harmonic equations.\nThese are by definition missing higher derivatives")
+
     Hopf_vars = first.(getfield.(filter(x -> x.type == "Hopf", eom.variables), :symbol))
     Hopf_idx = findall(x -> any(isequal.(x, Hopf_vars)) , get_variables(eom))
-    nonsingular = filter( x -> x ∉ Hopf_idx, 1:length(get_variables(eom)))
+    nonsingular = filter( x -> x ∉ Hopf_idx, 1:length(get_variables(eom))) # leave out any variables tagged as Hopf - these make J singular
 
     vars_simp = Dict([var => HarmonicBalance.declare_variable(var_name(var)) for var in get_variables(eom)])
     T = get_independent_variables(eom)[1]
-    J = get_Jacobian(eom.equations, d(get_variables(eom), T, differential_order))[nonsingular, nonsingular]
+    J = get_Jacobian(eom.equations, d(get_variables(eom), T, order))[nonsingular, nonsingular]
     
     expand_derivatives.(HarmonicBalance.substitute_all(J, vars_simp))
 end
 
-# COMPILE THIS!
+
+# COMPILE THIS?
+# return a function to find the Jacobian implicitly
 function get_implicit_Jacobian(eom::HarmonicEquation)::Function
-    M = get_Jacobian_steady(eom, differential_order=0)
-    Mp = get_Jacobian_steady(eom, differential_order=1)
+    J0 = _get_J_matrix(eom, order=0)
+    J1 = _get_J_matrix(eom, order=1)
 
     function J(soln::OrderedDict)
-        -inv(ComplexF64.(substitute_all(Mp, soln))) * ComplexF64.(substitute_all(M, soln))
+        -inv(ComplexF64.(substitute_all(J1, soln))) * ComplexF64.(substitute_all(J0, soln))
     end
     J
 end
 
-
-###
-# STUFF BELOW IS FOR THE CORRECTED JACOBIAN METHOD
-###
-
-
-"""
-    get_response_matrix(diff_eq::DifferentialEquation, freq::Num; order=2)
-
-Obtain the symbolic linear response matrix of a `diff_eq` corresponding to a perturbation frequency `freq`.
-This routine cannot accept a `HarmonicEquation` since there, some time-derivatives are already dropped.
-`order` denotes the highest differential order to be considered.
-
-"""
-function get_response_matrix(diff_eq::DifferentialEquation, freq::Num; order=2)::Matrix
-    @variables T, i
-    time = get_independent_variables(diff_eq)[1]
-
-    eom = HarmonicBalance.harmonic_ansatz(diff_eq, time)
-
-    # replace the time-dependence of harmonic variables by slow time BUT do not drop any derivatives
-    eom = HarmonicBalance.slow_flow(eom, fast_time=time, slow_time=T, degree=order+1)
-
-    eom = HarmonicBalance.fourier_transform(eom, time)
-
-    M = get_Jacobian(eom.equations, get_variables(eom))
-    for n in 1:order
-        M += (i * freq)^n * get_Jacobian(eom.equations, d(get_variables(eom), T, n))
-    end
-    M = substitute_all(M, [var => HarmonicBalance.declare_variable(var_name(var)) for var in get_variables(eom)])
-    substitute_all(expand_derivatives.(M), i => im)
-end

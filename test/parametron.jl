@@ -1,4 +1,4 @@
-using HarmonicBalance
+using HarmonicBalance, LinearAlgebra
 using Symbolics
 using Test
 
@@ -15,11 +15,17 @@ p = HarmonicBalance.Problem(harmonic_eq);
 
 fixed_parameters = (Ω => 1.0,γ => 1E-2, λ => 5E-2, F => 1E-3,  α => 1.,  η=>0.3, θ => 0, ψ => 0)
 sweep = ω => LinRange(0.9, 1.1, 100)
-soln = HarmonicBalance.get_steady_states(p, sweep, fixed_parameters)
+res = HarmonicBalance.get_steady_states(p, sweep, fixed_parameters)
 
 # save the result, try and load in the next step
 #current_path = @__DIR__
-#HarmonicBalance.save(current_path * "/parametron_result.jld2", soln)
+#HarmonicBalance.save(current_path * "/parametron_result.jld2", res)
+
+# test the implicit Jacobian solver against the default explicit solver
+test_soln = res[50][1]
+J_implicit = HarmonicBalance.LinearResponse.get_implicit_Jacobian(harmonic_eq)
+
+@test isless(norm(res.jacobian(test_soln) .- J_implicit(test_soln)) / norm(res.jacobian(test_soln)), 1E-10)
 
 
 ###
