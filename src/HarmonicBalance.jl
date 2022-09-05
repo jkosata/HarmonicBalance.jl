@@ -54,9 +54,9 @@ module HarmonicBalance
     include("modules/LinearResponse.jl")
     using .LinearResponse
 
-    #include("modules/TimeEvolution.jl")
-    #using .TimeEvolution
-    #export ParameterSweep
+    include("modules/TimeEvolution.jl")
+    using .TimeEvolution
+    export ParameterSweep
 
     include("modules/Hopf.jl")
     using .Hopf
